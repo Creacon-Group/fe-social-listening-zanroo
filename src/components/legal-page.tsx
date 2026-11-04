@@ -3,7 +3,7 @@ import Link from "next/link";
 export type LegalSection = { id: string; title: string; body: React.ReactNode };
 
 export const COMPANY = {
-  name: "Zanroo Indonesia",
+  name: "PT Zanroo Tech Indonesia",
   // TODO: replace with Zanroo Indonesia's registered office address before going beyond demo.
   address: ["Jakarta, Indonesia"],
   email: "arie@zanroo.com",

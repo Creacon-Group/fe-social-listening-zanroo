@@ -3,7 +3,7 @@
 @custom-variant dark (@media (prefers-color-scheme: dark));
 
 /*
- * Palette from the original (Creacon) build, kept as-is for Zanroo: black ink like the wordmark, and one accent, the indigo from the
+ * Palette kept from the original build: black ink like the wordmark, and one accent, the indigo from the
  * middle of the logo's cyan-to-magenta mark (darkened a step so text on it passes WCAG AA).
  * The accent marks "us" (own brands, the current page, links) and nothing else; the gradient
  * itself appears only in the logo. Sentiment keeps a teal / rust pair because it encodes data.
