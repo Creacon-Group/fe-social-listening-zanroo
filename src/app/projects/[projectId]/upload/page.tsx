@@ -1,12 +1,14 @@
 "use client";
 
+import Link from "next/link";
 import { upload } from "@vercel/blob/client";
 import { useEffect, useRef, useState } from "react";
 import useSWR from "swr";
 import { Notice, PageHeader, Panel } from "@/components/ui";
 import { apiSend, fetcher } from "@/lib/api";
 import { fmt, fmtDateTime } from "@/lib/format";
-import { useMe, useProjectId } from "@/lib/project";
+import { useAccess } from "@/lib/permissions";
+import { useProjectId } from "@/lib/project";
 import type { Batch, BatchStatus } from "@/lib/types";
 
 // "blob": browser -> Vercel Blob -> API reads the URL (Vercel). "direct": multipart to the API (local / VPS).
@@ -45,7 +47,7 @@ function uploadDirect(url: string, file: File, onProgress: (pct: number) => void
   });
 }
 
-function BatchRow({ projectId, batch }: { projectId: number; batch: Batch }) {
+function BatchRow({ projectId, batch, superadmin }: { projectId: number; batch: Batch; superadmin: boolean }) {
   const [open, setOpen] = useState(false);
   const { data: errors } = useSWR<{ items: { id: number; rowRef: string; message: string }[]; total: number }>(
     open ? `/api/projects/${projectId}/ingestion/batches/${batch.id}/errors?pageSize=50` : null,
@@ -69,8 +71,15 @@ function BatchRow({ projectId, batch }: { projectId: number; batch: Batch }) {
       {batch.errorMessage && <p className="mt-1 text-sm text-neg">{batch.errorMessage}</p>}
       {unmapped.length > 0 && (
         <p className="mt-1 text-xs text-muted">
-          Keywords without a brand: {unmapped.map(([k, n]) => `${k} (${fmt(n)})`).join(", ")}. Add them as brand aliases if
-          they belong to a brand.
+          Keywords without a brand: {unmapped.map(([k, n]) => `${k} (${fmt(n)})`).join(", ")}.{" "}
+          {superadmin ? (
+            <Link href={`/projects/${projectId}/admin-projects?project=${projectId}&tab=brands`} className="font-semibold text-ink underline">
+              Map them to brands
+            </Link>
+          ) : (
+            "Ask your admin to map them to brands."
+          )}{" "}
+          Existing mentions are re-tagged when a keyword is mapped.
         </p>
       )}
       {batch.failedRows > 0 && (
@@ -96,7 +105,7 @@ function BatchRow({ projectId, batch }: { projectId: number; batch: Batch }) {
 
 export default function UploadPage() {
   const projectId = useProjectId();
-  const { data: me } = useMe();
+  const { data: access, can } = useAccess(projectId);
   const inputRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
   const [progress, setProgress] = useState<number | null>(null);
@@ -130,6 +139,7 @@ export default function UploadPage() {
         const blob = await upload(`uploads/${file.name}`, file, {
           access: "private",
           handleUploadUrl: "/api/blob/upload",
+          clientPayload: String(projectId), // the token route checks data.upload in this project
           multipart: true,
           // No onUploadProgress: with it the SDK streams each part, and a retried part then fails
           // with "ReadableStream is disturbed". Without it parts are Blobs and retries work.
@@ -148,14 +158,14 @@ export default function UploadPage() {
     }
   }
 
-  const canUpload = me && me.role !== "VIEWER";
+  const canUpload = access && can("data.upload");
 
   return (
     <div className="space-y-5">
       <PageHeader title="Upload data" detail="Excel exports from Zanroo (.xlsx). Messages from the Zanroo webhook appear in the history as one entry per day." />
 
-      {me && !canUpload ? (
-        <Notice>Viewer accounts can only read data. Ask an admin to upload the file.</Notice>
+      {access && !canUpload ? (
+        <Notice>Your access in this project doesn&apos;t include uploading data. Ask an admin if you need it.</Notice>
       ) : (
         <Panel>
           <div className="flex flex-wrap items-center gap-3">
@@ -200,7 +210,7 @@ export default function UploadPage() {
         ) : (
           <ul className="divide-y divide-line">
             {batches.map((b) => (
-              <BatchRow key={b.id} projectId={projectId} batch={b} />
+              <BatchRow key={b.id} projectId={projectId} batch={b} superadmin={access?.role === "SUPERADMIN"} />
             ))}
           </ul>
         )}
